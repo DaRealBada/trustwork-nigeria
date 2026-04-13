@@ -16,9 +16,8 @@ interface WorkerSharePanelProps {
   emoji: string
 }
 
-export function WorkerSharePanel({
-  name, slug, headline, rating, reviewCount, skill, city, area, accent, light, emoji,
-}: WorkerSharePanelProps) {
+export function WorkerSharePanel(props: WorkerSharePanelProps) {
+  const { name, slug, rating, reviewCount, skill, city, area, accent, emoji } = props
   const [copied, setCopied] = useState<'link' | 'bio' | null>(null)
   const [open, setOpen] = useState(false)
 

@@ -159,16 +159,6 @@ export default function MyProfilePage() {
     setTimeout(() => setCopied(null), 2000)
   }
 
-  async function shareProfile() {
-    const msg = `Hi, I'm ${profile.name}\n${profile.headline}\n\nSee my verified profile on TrustWork:\n${PROFILE_URL}`
-    const next = { ...profile, hasShared: true, shareCount: profile.shareCount + 1 }
-    save(next)
-    if (navigator.share) {
-      try { await navigator.share({ title: `${profile.name} on TrustWork`, text: msg, url: PROFILE_URL }); return } catch {}
-    }
-    copyLink()
-  }
-
   async function copyBio() {
     const bio = `${profile.name} | ${SKILL_CATEGORIES.find(c => c.slug === profile.skills[0])?.name ?? profile.skills[0]}\n📍 ${profile.area ? profile.area + ', ' : ''}${profile.city}\n✅ Verified on TrustWork\n🔗 ${PROFILE_URL}`
     await navigator.clipboard.writeText(bio)

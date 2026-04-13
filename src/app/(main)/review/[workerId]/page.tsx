@@ -46,7 +46,7 @@ export default function ReviewPage({ params }: { params: { workerId: string } })
   const [hireDate, setHireDate] = useState('')
   const [howFound, setHowFound] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('')
-  const [hireConfirmed, setHireConfirmed] = useState(false)
+  const [, setHireConfirmed] = useState(false)
   const [gateError, setGateError] = useState('')
 
   // Review state
