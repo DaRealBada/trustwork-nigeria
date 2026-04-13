@@ -6,6 +6,7 @@ interface AvatarProps {
   name: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
+  accentColor?: string
 }
 
 const sizes = { sm: 32, md: 40, lg: 56, xl: 80 }
@@ -14,7 +15,7 @@ function initials(name: string) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 }
 
-export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
+export function Avatar({ src, name, size = 'md', className, accentColor }: AvatarProps) {
   const px = sizes[size]
   const sizeClass = {
     sm: 'w-8 h-8 text-xs',
@@ -32,10 +33,10 @@ export function Avatar({ src, name, size = 'md', className }: AvatarProps) {
   }
 
   return (
-    <div className={cn(
-      'rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white bg-green-600',
-      sizeClass, className
-    )}>
+    <div
+      className={cn('rounded-full flex-shrink-0 flex items-center justify-center font-semibold text-white', sizeClass, className)}
+      style={{ backgroundColor: accentColor ?? '#16a34a' }}
+    >
       {initials(name)}
     </div>
   )
