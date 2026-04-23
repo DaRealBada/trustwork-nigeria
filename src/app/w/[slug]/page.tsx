@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
-import { Star, MapPin, CheckCircle, Award, ShieldCheck, Briefcase, ThumbsUp, MessageCircle } from 'lucide-react'
+import { MapPin, CheckCircle, Award, ShieldCheck, Briefcase, ThumbsUp, MessageCircle } from 'lucide-react'
 import { getCategoryByName } from '@/lib/utils/constants'
 import { formatNaira } from '@/lib/utils/formatters'
 import type { Metadata } from 'next'
 import { WorkerSharePanel } from '@/components/profile/WorkerSharePanel'
 import { BehaviouralStats } from '@/components/profile/BehaviouralStats'
 
-type Review = { name: string; rating: number; text: string; date: string; trustLevel: 1 | 2 | 3 }
+type Confirmation = { name: string; verdict: 'positive' | 'neutral' | 'negative'; note?: string; jobType: string; contextTags?: string[]; date: string; trustLevel: 1 | 2 | 3 }
 type WorkHistory = { role: string; employer: string; period: string; description: string; verifiedBy?: 'whatsapp' | 'reference_code' }
 type SkillEndorsement = { skill: string; endorsers: string[]; count: number }
 type Milestone = { label: string; done: boolean; reward: string; weight: number }
@@ -28,8 +28,10 @@ type WorkerProfile = {
   rateMin: number
   rateMax: number
   rateType: 'daily' | 'hourly' | 'monthly' | 'project'
-  avgRating: number
-  reviewCount: number
+  recommendRatio: number   // % who said 👍
+  confirmedJobs: number    // total job confirmations
+  networkContacts: number  // how many of "your" contacts confirmed them (mock)
+  contextTags: string[]    // aggregated context tags from confirmers
   yearsExp: number
   verified: boolean
   joinedYear: number
@@ -37,7 +39,7 @@ type WorkerProfile = {
   workHistory: WorkHistory[]
   skillEndorsements: SkillEndorsement[]
   milestones: Milestone[]
-  reviews: Review[]
+  confirmations: Confirmation[]
   behavioural: BehaviouralData
 }
 
@@ -50,7 +52,8 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
     city: 'Lagos', area: 'Lekki',
     primarySkill: 'Chef / Cook',
     rateMin: 15000, rateMax: 30000, rateType: 'daily',
-    avgRating: 4.9, reviewCount: 34,
+    recommendRatio: 94, confirmedJobs: 34, networkContacts: 3,
+    contextTags: ['Family household', 'High-end project', 'Corporate / office'],
     yearsExp: 12, verified: true, joinedYear: 2022, completedJobs: 87,
     workHistory: [
       {
@@ -88,10 +91,10 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
       { label: '10+ reviews · 4.5+ avg',  done: false, reward: '"Top Rated" badge + featured listing',   weight: 25 },
       { label: 'Profile shared 3+ times', done: false, reward: '90-day permanent search boost',           weight: 10 },
     ],
-    reviews: [
-      { name: 'Chioma A.', rating: 5, text: 'Emeka cooked for my daughter\'s naming ceremony — 120 guests, everything was perfect. He organised it all himself. Will definitely use him again.', date: '2024-11', trustLevel: 1 },
-      { name: 'Tunde B.',  rating: 5, text: 'We hired him as our family chef on a monthly basis. Very clean, time-conscious, and the food is consistently excellent.', date: '2024-09', trustLevel: 2 },
-      { name: 'Mrs. Fashola', rating: 4, text: 'Jollof rice and egusi were amazing. Only small issue was he arrived 20 min late on day one — after that no problem at all.', date: '2024-07', trustLevel: 3 },
+    confirmations: [
+      { name: 'Chioma A.',    verdict: 'positive', note: 'Cooked for my daughter\'s naming — 120 guests. Organised everything himself. Will use again.', jobType: 'Cooking / Chef', contextTags: ['Family household'], date: '2024-11', trustLevel: 1 },
+      { name: 'Tunde B.',     verdict: 'positive', note: 'Our family chef for months. Very clean, always on time, food is excellent.', jobType: 'Cooking / Chef', contextTags: ['Family household', 'High-end project'], date: '2024-09', trustLevel: 2 },
+      { name: 'Anonymous',    verdict: 'neutral',  note: 'Food was good but arrived late on day one.', jobType: 'Cooking / Chef', contextTags: [], date: '2024-07', trustLevel: 3 },
     ],
     behavioural: { responseRate: 92, avgResponseHours: 2, cancellationRate: 3, repeatHireRate: 68, memberSinceYear: 2022, totalJobsCompleted: 87 },
   },
@@ -103,7 +106,8 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
     city: 'Lagos', area: 'Victoria Island',
     primarySkill: 'Plumber',
     rateMin: 10000, rateMax: 25000, rateType: 'daily',
-    avgRating: 4.7, reviewCount: 21,
+    recommendRatio: 88, confirmedJobs: 21, networkContacts: 1,
+    contextTags: ['Emergency callout', 'Budget-conscious'],
     yearsExp: 8, verified: false, joinedYear: 2023, completedJobs: 43,
     workHistory: [
       {
@@ -132,9 +136,9 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
       { label: '10+ reviews · 4.5+ avg',  done: false, reward: '"Top Rated" badge + featured listing',  weight: 25 },
       { label: 'Profile shared 3+ times', done: false, reward: '90-day permanent search boost',          weight: 10 },
     ],
-    reviews: [
-      { name: 'Chioma A.', rating: 5, text: 'Fixed a burst pipe at 9pm without fuss. Came within the hour. Very reasonable charge.', date: '2024-10', trustLevel: 1 },
-      { name: 'James O.',  rating: 4, text: 'Good work on bathroom installation. Left the site clean.', date: '2024-08', trustLevel: 3 },
+    confirmations: [
+      { name: 'Chioma A.', verdict: 'positive', note: 'Fixed burst pipe at 9pm. Came within the hour. Reasonable charge.', jobType: 'Plumbing', contextTags: ['Emergency callout'], date: '2024-10', trustLevel: 1 },
+      { name: 'James O.',  verdict: 'positive', note: 'Good bathroom installation. Left site clean.', jobType: 'Plumbing', contextTags: ['Budget-conscious'], date: '2024-08', trustLevel: 3 },
     ],
     behavioural: { responseRate: 85, avgResponseHours: 4, cancellationRate: 8, repeatHireRate: 55, memberSinceYear: 2023, totalJobsCompleted: 43 },
   },
@@ -145,7 +149,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   if (!worker) return { title: 'Worker not found' }
   return {
     title: `${worker.name} — TrustWork`,
-    description: `${worker.headline}. ${worker.reviewCount} verified reviews. Find trusted workers through people you know.`,
+    description: `${worker.headline}. ${worker.confirmedJobs} job confirmations. Find trusted workers through people you know.`,
     openGraph: {
       title: `${worker.name} on TrustWork`,
       description: worker.headline,
@@ -154,22 +158,16 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   }
 }
 
-function Stars({ rating }: { rating: number }) {
-  return (
-    <div className="flex gap-0.5">
-      {[1,2,3,4,5].map(i => (
-        <Star key={i} size={13}
-          className={i <= Math.round(rating) ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-200'} />
-      ))}
-    </div>
-  )
-}
-
 const RATE_LABELS = { daily: 'day', hourly: 'hr', monthly: 'month', project: 'project' }
 const TRUST_STYLES = {
   1: { bar: 'bg-green-500', badge: 'bg-green-50 border-green-200 text-green-700', tag: 'Your contact' },
   2: { bar: 'bg-blue-400',  badge: 'bg-blue-50 border-blue-200 text-blue-700',   tag: 'Trusted network' },
-  3: { bar: 'bg-gray-300',  badge: 'bg-gray-50 border-gray-200 text-gray-500',   tag: 'Public review' },
+  3: { bar: 'bg-gray-300',  badge: 'bg-gray-50 border-gray-200 text-gray-500',   tag: 'Public' },
+}
+const VERDICT_STYLES = {
+  positive: { emoji: '👍', label: 'Recommends', color: 'text-green-600' },
+  neutral:  { emoji: '😐', label: 'It was okay', color: 'text-amber-600' },
+  negative: { emoji: '👎', label: 'Would not recommend', color: 'text-red-500' },
 }
 
 export default function WorkerPublicProfile({ params }: { params: { slug: string } }) {
@@ -248,19 +246,43 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
           {/* Stats */}
           <div className="grid grid-cols-3 gap-0 mt-4 pt-4 border-t border-gray-100 text-center">
             <div>
-              <p className="text-lg font-black text-gray-900">{worker.avgRating}</p>
-              <div className="flex justify-center mt-0.5"><Stars rating={worker.avgRating} /></div>
-              <p className="text-xs text-gray-400 mt-0.5">{worker.reviewCount} reviews</p>
+              <p className="text-lg font-black" style={{ color: accent }}>{worker.recommendRatio}%</p>
+              <p className="text-xs text-gray-400 mt-0.5">recommend</p>
+              <p className="text-xs text-gray-400">{worker.confirmedJobs} confirmed jobs</p>
             </div>
             <div className="border-x border-gray-100">
-              <p className="text-lg font-black text-gray-900">{worker.yearsExp}</p>
-              <p className="text-xs text-gray-400 mt-1">yrs experience</p>
+              {worker.networkContacts > 0 ? (
+                <>
+                  <p className="text-lg font-black text-green-600">{worker.networkContacts}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">your contacts</p>
+                  <p className="text-xs text-gray-400">used them</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-black text-gray-400">{worker.yearsExp}</p>
+                  <p className="text-xs text-gray-400 mt-1">yrs experience</p>
+                </>
+              )}
             </div>
             <div>
               <p className="text-lg font-black" style={{ color: accent }}>{formatNaira(worker.rateMin)}</p>
               <p className="text-xs text-gray-400 mt-1">from / {rateLabel}</p>
             </div>
           </div>
+
+          {/* Context tags — who hired them */}
+          {worker.contextTags.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-2">Used by</p>
+              <div className="flex flex-wrap gap-1.5">
+                {worker.contextTags.map(tag => (
+                  <span key={tag} className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 bg-gray-50">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Share panel — WhatsApp + copy + link */}
@@ -268,8 +290,8 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
           name={worker.name}
           slug={worker.slug}
           headline={worker.headline}
-          rating={worker.avgRating}
-          reviewCount={worker.reviewCount}
+          rating={worker.recommendRatio}
+          reviewCount={worker.confirmedJobs}
           skill={worker.primarySkill}
           city={worker.city}
           area={worker.area}
@@ -399,25 +421,34 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
           <BehaviouralStats data={worker.behavioural} accent={accent} light={light} />
         </div>
 
-        {/* Reviews */}
+        {/* Job Confirmations */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-3">
           <div className="flex items-center gap-2 mb-4">
             <MessageCircle size={15} style={{ color: accent }} />
-            <h2 className="text-sm font-bold text-gray-900">Reviews <span className="text-gray-400 font-normal">({worker.reviewCount})</span></h2>
+            <h2 className="text-sm font-bold text-gray-900">
+              Job Confirmations <span className="text-gray-400 font-normal">({worker.confirmedJobs})</span>
+            </h2>
           </div>
           <div className="space-y-4">
-            {worker.reviews.map((r, i) => {
-              const style = TRUST_STYLES[r.trustLevel]
+            {worker.confirmations.map((c, i) => {
+              const style = TRUST_STYLES[c.trustLevel]
+              const verdict = VERDICT_STYLES[c.verdict]
               return (
                 <div key={i} className="relative pl-3">
                   <div className={`absolute left-0 top-0 bottom-0 w-0.5 rounded-full ${style.bar}`} />
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-sm font-semibold text-gray-900">{r.name}</span>
-                    <Stars rating={r.rating} />
+                    <span className="text-sm font-semibold text-gray-900">{c.name}</span>
+                    <span className={`text-xs font-bold ${verdict.color}`}>{verdict.emoji} {verdict.label}</span>
                     <span className={`text-xs px-1.5 py-0.5 rounded-full border ${style.badge}`}>{style.tag}</span>
                   </div>
-                  <p className="text-sm text-gray-600 leading-relaxed">{r.text}</p>
-                  <p className="text-xs text-gray-400 mt-1">{r.date}</p>
+                  <div className="flex gap-1.5 mb-1.5 flex-wrap">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{c.jobType}</span>
+                    {c.contextTags?.map(tag => (
+                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{tag}</span>
+                    ))}
+                  </div>
+                  {c.note && <p className="text-sm text-gray-600 leading-relaxed">{c.note}</p>}
+                  <p className="text-xs text-gray-400 mt-1">{c.date}</p>
                 </div>
               )
             })}
@@ -430,7 +461,7 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
             Want to hire {worker.name.split(' ')[0]}?
           </p>
           <p className="text-xs text-gray-500 mb-4">
-            Join TrustWork free — search workers that people in your contacts have personally hired and reviewed.
+            Join TrustWork free — see who your contacts have confirmed and recommended.
           </p>
           <a
             href="/search"

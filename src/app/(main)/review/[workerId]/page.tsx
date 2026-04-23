@@ -2,9 +2,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/Button'
-import { Star, CheckCircle, AlertCircle, ShieldCheck, Eye, EyeOff, Calendar, Banknote } from 'lucide-react'
+import { CheckCircle, AlertCircle, ShieldCheck, Calendar, Briefcase } from 'lucide-react'
 
-type ReviewStep = 'hire_gate' | 'rating' | 'review' | 'submitted'
+type Step = 'gate' | 'confirm' | 'submitted'
 
 const WORKER_NAMES: Record<string, string> = {
   '1': 'Emeka Okonkwo',
@@ -22,116 +22,118 @@ const HOW_FOUND_OPTIONS = [
   'Other',
 ]
 
-const PAYMENT_OPTIONS = [
-  'Bank transfer',
-  'Cash',
-  'Palmpay / Opay / mobile money',
-  'Agreed rate, paid after job',
+const JOB_TYPES = [
+  'Cooking / Chef',
+  'Plumbing',
+  'Carpentry / Joinery',
+  'Electrical',
+  'Cleaning',
+  'Driving / Logistics',
+  'Childcare / Nanny',
+  'Security / Guard',
+  'Tailoring / Fashion',
+  'Other',
 ]
 
-const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent']
-
-const STRUCTURED_QUESTIONS = [
-  { key: 'punctual',   label: 'Did they show up on time?'           },
-  { key: 'quality',   label: 'Was the quality of work as expected?' },
-  { key: 'honest',    label: 'Were they honest and trustworthy?'    },
-  { key: 'rehire',    label: 'Would you hire them again?'           },
+const JOB_SIZES = [
+  { label: 'Small fix / one-off', sub: 'A few hours' },
+  { label: 'Medium project', sub: 'A few days' },
+  { label: 'Ongoing / regular', sub: 'Weekly or monthly' },
+  { label: 'Large project', sub: 'Weeks or longer' },
 ]
 
-export default function ReviewPage({ params }: { params: { workerId: string } }) {
+const CONTEXT_TAGS = [
+  'Family household', 'High-end project', 'Budget-conscious',
+  'UK / foreign returnee', 'Corporate / office', 'Emergency callout',
+]
+
+type Verdict = 'positive' | 'neutral' | 'negative'
+
+const VERDICT_CONFIG: Record<Verdict, { emoji: string; label: string; sub: string; bg: string; border: string; text: string }> = {
+  positive: { emoji: '👍', label: 'Recommend',     sub: 'I would use them again',           bg: 'bg-green-50',  border: 'border-green-400', text: 'text-green-700' },
+  neutral:  { emoji: '😐', label: 'It was okay',   sub: 'Did the job, nothing special',      bg: 'bg-amber-50',  border: 'border-amber-400', text: 'text-amber-700' },
+  negative: { emoji: '👎', label: 'Would not recommend', sub: 'I would not use them again', bg: 'bg-red-50',    border: 'border-red-400',   text: 'text-red-700'   },
+}
+
+export default function ConfirmJobPage({ params }: { params: { workerId: string } }) {
   const router = useRouter()
   const workerName = WORKER_NAMES[params.workerId] ?? 'this worker'
+  const firstName = workerName.split(' ')[0]
 
-  // Hire gate state
-  const [hireDate, setHireDate] = useState('')
+  // Gate state
+  const [jobDate, setJobDate] = useState('')
   const [howFound, setHowFound] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('')
-  const [, setHireConfirmed] = useState(false)
   const [gateError, setGateError] = useState('')
 
-  // Review state
-  const [step, setStep] = useState<ReviewStep>('hire_gate')
-  const [rating, setRating] = useState(0)
-  const [hover, setHover] = useState(0)
-  const [structured, setStructured] = useState<Record<string, boolean | null>>({
-    punctual: null, quality: null, honest: null, rehire: null,
-  })
-  const [body, setBody] = useState('')
+  // Confirmation state
+  const [verdict, setVerdict] = useState<Verdict | null>(null)
+  const [jobType, setJobType] = useState('')
+  const [jobSize, setJobSize] = useState('')
+  const [contextTags, setContextTags] = useState<string[]>([])
+  const [note, setNote] = useState('')
   const [isAnonymous, setIsAnonymous] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // Auto-suggest anonymity for negative reviews
-  const isNegative = rating > 0 && rating <= 2
+  const [step, setStep] = useState<Step>('gate')
 
-  function confirmHire() {
+  function toggleTag(tag: string) {
+    setContextTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+  }
+
+  function confirmGate() {
     setGateError('')
-    if (!hireDate) { setGateError('Please enter when you hired them'); return }
+    if (!jobDate) { setGateError('Please enter when the job took place'); return }
     if (!howFound) { setGateError('Please select how you found them'); return }
-    if (!paymentMethod) { setGateError('Please select the payment method'); return }
-
-    // Validate hire date is within past 60 days
-    const hired = new Date(hireDate)
+    const date = new Date(jobDate)
     const now = new Date()
-    const daysDiff = (now.getTime() - hired.getTime()) / (1000 * 60 * 60 * 24)
-    if (daysDiff > 365) {
-      setGateError('You can only review workers hired within the past 12 months')
-      return
-    }
-    if (hired > now) {
-      setGateError('Hire date cannot be in the future')
-      return
-    }
-    setHireConfirmed(true)
-    setStep('rating')
+    if (date > now) { setGateError('Date cannot be in the future'); return }
+    const days = (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24)
+    if (days > 365) { setGateError('You can only confirm jobs within the past 12 months'); return }
+    setStep('confirm')
   }
 
-  function toggleStructured(key: string, val: boolean) {
-    setStructured(prev => ({ ...prev, [key]: prev[key] === val ? null : val }))
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (rating === 0 || body.length < 20) return
+  async function handleSubmit() {
+    if (!verdict || !jobType) return
     setLoading(true)
-    await new Promise(r => setTimeout(r, 1000))
+    await new Promise(r => setTimeout(r, 900))
     setLoading(false)
     setStep('submitted')
   }
 
-  // ── Hire confirmation gate ──
-  if (step === 'hire_gate') {
+  // ── Gate ──
+  if (step === 'gate') {
     return (
       <div className="max-w-lg mx-auto p-4 pb-10">
         <div className="mb-5">
-          <h1 className="text-xl font-black text-gray-900">Write a Review</h1>
+          <h1 className="text-xl font-black text-gray-900">Confirm a Job</h1>
           <p className="text-sm text-gray-500 mt-1">
-            TrustWork only accepts reviews from verified hires. This protects workers from fake negative reviews and employers from fake positive ones.
+            Your confirmation tells your network that this person did real work for you. No stars — just your honest take.
           </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
           <div className="flex items-center gap-2 mb-4">
             <ShieldCheck size={16} className="text-green-600" />
-            <h2 className="text-sm font-bold text-gray-900">Confirm you hired {workerName.split(' ')[0]}</h2>
+            <h2 className="text-sm font-bold text-gray-900">Verify the job happened</h2>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1">
-                When did you hire them? <span className="text-red-400">*</span>
+                When did the job take place? <span className="text-red-400">*</span>
               </label>
-              <input type="date" value={hireDate} onChange={e => setHireDate(e.target.value)}
+              <input type="date" value={jobDate} onChange={e => setJobDate(e.target.value)}
                 max={new Date().toISOString().split('T')[0]}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
                 <Calendar size={10} />
-                Reviews only accepted within 12 months of hire date
+                Only accepted within 12 months
               </p>
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                How did you find them? <span className="text-red-400">*</span>
+                How did you find {firstName}? <span className="text-red-400">*</span>
               </label>
               <div className="space-y-2">
                 {HOW_FOUND_OPTIONS.map(opt => (
@@ -151,24 +153,6 @@ export default function ReviewPage({ params }: { params: { workerId: string } })
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                How did you pay them? <span className="text-red-400">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {PAYMENT_OPTIONS.map(opt => (
-                  <label key={opt} className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-colors ${
-                    paymentMethod === opt ? 'border-green-300 bg-green-50' : 'border-gray-200 hover:bg-gray-50'
-                  }`}>
-                    <input type="radio" name="payment" value={opt}
-                      checked={paymentMethod === opt} onChange={() => setPaymentMethod(opt)} className="sr-only" />
-                    <Banknote size={13} className={paymentMethod === opt ? 'text-green-600' : 'text-gray-400'} />
-                    <span className="text-xs text-gray-700">{opt}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
             {gateError && (
               <div className="flex items-start gap-2 p-3 bg-red-50 rounded-xl border border-red-100">
                 <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
@@ -178,14 +162,12 @@ export default function ReviewPage({ params }: { params: { workerId: string } })
 
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
               <p className="text-xs text-blue-700">
-                <strong>Why do we ask this?</strong> False reviews are a serious problem in digital marketplaces.
-                By confirming hire details, your review gets a <em>Verified Hire</em> badge that carries significantly
-                more weight in the worker&apos;s trust score. Workers cannot ask you to leave reviews — only genuine employers can.
+                <strong>Why no stars?</strong> A recommendation from someone your contacts trust is worth more than 100 anonymous five-star ratings. Your job confirmation helps people in your network make better decisions — fast.
               </p>
             </div>
 
-            <Button onClick={confirmHire} className="w-full" size="lg">
-              Confirm & write review
+            <Button onClick={confirmGate} className="w-full" size="lg">
+              Continue
             </Button>
           </div>
         </div>
@@ -195,138 +177,170 @@ export default function ReviewPage({ params }: { params: { workerId: string } })
 
   // ── Submitted ──
   if (step === 'submitted') {
+    const v = verdict ? VERDICT_CONFIG[verdict] : null
     return (
       <div className="max-w-lg mx-auto p-4 text-center py-16">
         <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle size={40} className="text-green-600" />
         </div>
-        <h2 className="text-xl font-black text-gray-900 mb-2">Review submitted</h2>
+        <h2 className="text-xl font-black text-gray-900 mb-2">Job confirmed</h2>
+        {v && (
+          <p className="text-2xl mb-2">{v.emoji}</p>
+        )}
         <p className="text-sm text-gray-500 mb-1">
-          {isAnonymous ? 'Your review will appear anonymously.' : `Your review will appear under your name.`}
+          {isAnonymous ? 'Your confirmation is anonymous.' : 'Your name is attached to this confirmation.'}
         </p>
         <p className="text-sm text-gray-500 mb-6">
-          Verified hire reviews update the worker&apos;s trust score within 24 hours.
+          People in your network will see that you worked with {firstName} when they search for this type of worker.
         </p>
-        <button onClick={() => router.push(`/worker/${params.workerId}`)}
+        <button onClick={() => router.push(`/w/${params.workerId}`)}
           className="bg-green-600 text-white font-bold px-6 py-3 rounded-xl text-sm">
-          Back to {workerName.split(' ')[0]}&apos;s profile
+          Back to {firstName}&apos;s profile
         </button>
       </div>
     )
   }
 
-  // ── Rating + Review ──
+  // ── Confirmation step ──
   return (
     <div className="max-w-lg mx-auto p-4 pb-10">
-      {/* Hire confirmed banner */}
       <div className="flex items-center gap-2 bg-green-50 border border-green-100 rounded-xl px-4 py-2.5 mb-5">
         <CheckCircle size={14} className="text-green-600 flex-shrink-0" />
-        <p className="text-xs text-green-700 font-semibold">Hire confirmed — your review will carry a Verified Hire badge</p>
+        <p className="text-xs text-green-700 font-semibold">Job verified — your confirmation counts in {firstName}&apos;s trust network</p>
       </div>
 
       <div className="mb-5">
-        <h1 className="text-xl font-black text-gray-900">Rate {workerName.split(' ')[0]}</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Your honest review helps others in your network make better decisions</p>
+        <h1 className="text-xl font-black text-gray-900">Would you recommend {firstName}?</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Your honest take helps people in your network decide faster</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
 
-        {/* Star rating */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 text-center">
-          <p className="text-sm font-semibold text-gray-700 mb-3">Overall rating</p>
-          <div className="flex justify-center gap-2">
-            {[1,2,3,4,5].map(i => (
-              <button key={i} type="button"
-                onClick={() => { setRating(i); setIsAnonymous(i <= 2) }}
-                onMouseEnter={() => setHover(i)}
-                onMouseLeave={() => setHover(0)}>
-                <Star size={36} className={i <= (hover || rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-200'} />
+        {/* Verdict — the core signal */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <p className="text-sm font-bold text-gray-900 mb-3">Your verdict</p>
+          <div className="space-y-2">
+            {(Object.entries(VERDICT_CONFIG) as [Verdict, typeof VERDICT_CONFIG[Verdict]][]).map(([key, cfg]) => (
+              <button key={key} type="button"
+                onClick={() => { setVerdict(key); if (key === 'negative') setIsAnonymous(true) }}
+                className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 transition-all text-left ${
+                  verdict === key ? `${cfg.bg} ${cfg.border}` : 'border-gray-100 hover:bg-gray-50'
+                }`}>
+                <span className="text-2xl">{cfg.emoji}</span>
+                <div>
+                  <p className={`text-sm font-bold ${verdict === key ? cfg.text : 'text-gray-800'}`}>{cfg.label}</p>
+                  <p className="text-xs text-gray-400">{cfg.sub}</p>
+                </div>
               </button>
             ))}
           </div>
-          <p className="text-sm font-semibold mt-2 text-gray-600">
-            {rating === 0 ? 'Tap to rate' : RATING_LABELS[rating]}
-          </p>
         </div>
 
-        {/* Structured yes/no questions */}
-        {rating > 0 && (
+        {/* Job type */}
+        {verdict && (
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <p className="text-sm font-bold text-gray-900 mb-3">Quick questions</p>
-            <div className="space-y-3">
-              {STRUCTURED_QUESTIONS.map(({ key, label }) => (
-                <div key={key} className="flex items-center justify-between gap-3">
-                  <span className="text-sm text-gray-700 flex-1">{label}</span>
-                  <div className="flex gap-2 flex-shrink-0">
-                    {[true, false].map(val => (
-                      <button key={String(val)} type="button"
-                        onClick={() => toggleStructured(key, val)}
-                        className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${
-                          structured[key] === val
-                            ? val ? 'bg-green-600 text-white border-green-600' : 'bg-red-500 text-white border-red-500'
-                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                        }`}>
-                        {val ? 'Yes' : 'No'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="flex items-center gap-2 mb-3">
+              <Briefcase size={14} className="text-gray-400" />
+              <p className="text-sm font-bold text-gray-900">What type of job? <span className="text-red-400">*</span></p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {JOB_TYPES.map(t => (
+                <button key={t} type="button" onClick={() => setJobType(t)}
+                  className={`text-xs font-semibold px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                    jobType === t ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                  }`}>
+                  {t}
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Written review */}
-        {rating > 0 && (
+        {/* Job size */}
+        {verdict && jobType && (
           <div className="bg-white rounded-2xl border border-gray-100 p-5">
-            <label className="block text-sm font-bold text-gray-900 mb-2">
-              Written review <span className="text-gray-400 font-normal text-xs">(min 20 characters)</span>
-            </label>
-            <textarea value={body} onChange={e => setBody(e.target.value)}
-              placeholder={rating <= 2
-                ? "Tell others what went wrong. Be specific about what happened — not personal."
-                : "Tell others what made them great. Specific details help future employers most."}
-              rows={4}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
-            <p className="text-xs text-gray-400 mt-1">{body.length} characters</p>
+            <p className="text-sm font-bold text-gray-900 mb-3">How big was the job?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {JOB_SIZES.map(({ label, sub }) => (
+                <button key={label} type="button" onClick={() => setJobSize(label)}
+                  className={`text-left px-3 py-2.5 rounded-xl border transition-colors ${
+                    jobSize === label ? 'bg-green-50 border-green-300' : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  <p className={`text-xs font-semibold ${jobSize === label ? 'text-green-700' : 'text-gray-700'}`}>{label}</p>
+                  <p className="text-xs text-gray-400">{sub}</p>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Anonymous toggle — auto-on for negative reviews */}
-        {rating > 0 && (
-          <div className={`rounded-2xl border p-4 ${isNegative ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
-            <div className="flex items-start gap-3">
+        {/* Context tags */}
+        {verdict && jobType && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <p className="text-sm font-bold text-gray-900 mb-1">Describe your situation <span className="text-gray-400 font-normal text-xs">(optional)</span></p>
+            <p className="text-xs text-gray-400 mb-3">Helps people with similar needs find the right match</p>
+            <div className="flex flex-wrap gap-2">
+              {CONTEXT_TAGS.map(tag => (
+                <button key={tag} type="button" onClick={() => toggleTag(tag)}
+                  className={`text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+                    contextTags.includes(tag)
+                      ? 'bg-green-50 border-green-300 text-green-700'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Short note */}
+        {verdict && jobType && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <label className="block text-sm font-bold text-gray-900 mb-2">
+              Short note <span className="text-gray-400 font-normal text-xs">(optional)</span>
+            </label>
+            <textarea value={note} onChange={e => setNote(e.target.value)}
+              placeholder={verdict === 'negative'
+                ? 'What went wrong? Be specific, not personal.'
+                : 'What made them good? One sentence is enough.'}
+              rows={3}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none" />
+          </div>
+        )}
+
+        {/* Anonymous toggle */}
+        {verdict && (
+          <div className={`rounded-2xl border p-4 ${verdict === 'negative' ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100'}`}>
+            <div className="flex items-center gap-3">
               <button type="button" onClick={() => setIsAnonymous(a => !a)}
-                className={`flex-shrink-0 w-10 h-6 rounded-full transition-colors mt-0.5 ${isAnonymous ? 'bg-green-600' : 'bg-gray-200'}`}>
+                className={`flex-shrink-0 w-10 h-6 rounded-full transition-colors ${isAnonymous ? 'bg-green-600' : 'bg-gray-200'}`}>
                 <div className={`w-4 h-4 rounded-full bg-white shadow mx-1 transition-transform ${isAnonymous ? 'translate-x-4' : ''}`} />
               </button>
               <div>
-                <div className="flex items-center gap-2">
-                  {isAnonymous ? <EyeOff size={13} className="text-amber-600" /> : <Eye size={13} className="text-gray-500" />}
-                  <p className="text-sm font-bold text-gray-900">
-                    {isAnonymous ? 'Anonymous review' : 'Review under your name'}
-                  </p>
-                </div>
+                <p className="text-sm font-bold text-gray-900">
+                  {isAnonymous ? 'Anonymous confirmation' : 'Confirmation under your name'}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {isNegative
-                    ? 'Negative reviews are anonymous by default to protect your relationship with the worker\'s community. The review is still verified and counted in their trust score.'
-                    : 'Your name adds credibility — employers in your network see you vouched for this worker.'}
+                  {verdict === 'negative'
+                    ? 'Negative confirmations are anonymous by default. The signal still counts in the trust network.'
+                    : 'Your name adds credibility — people in your network see you vouched for this worker.'}
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {rating > 0 && body.length >= 20 && (
-          <Button type="submit" className="w-full" size="lg" loading={loading}>
-            Submit verified review
+        {verdict && jobType && (
+          <Button onClick={handleSubmit} className="w-full" size="lg" loading={loading}>
+            Submit job confirmation
           </Button>
         )}
 
-        {rating > 0 && body.length < 20 && body.length > 0 && (
-          <p className="text-xs text-center text-gray-400">{20 - body.length} more characters needed</p>
+        {verdict && !jobType && (
+          <p className="text-xs text-center text-gray-400">Select a job type to continue</p>
         )}
-      </form>
+      </div>
     </div>
   )
 }
