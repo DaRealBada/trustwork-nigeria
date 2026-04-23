@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { MapPin, CheckCircle, Award, ShieldCheck, Briefcase, ThumbsUp, MessageCircle } from 'lucide-react'
+import { MapPin, CheckCircle, Award, ShieldCheck, Briefcase, ThumbsUp, MessageCircle, UserCheck } from 'lucide-react'
 import { getCategoryByName } from '@/lib/utils/constants'
 import { formatNaira } from '@/lib/utils/formatters'
 import type { Metadata } from 'next'
@@ -7,6 +7,7 @@ import { WorkerSharePanel } from '@/components/profile/WorkerSharePanel'
 import { BehaviouralStats } from '@/components/profile/BehaviouralStats'
 
 type Confirmation = { name: string; verdict: 'positive' | 'neutral' | 'negative'; note?: string; jobType: string; contextTags?: string[]; date: string; trustLevel: 1 | 2 | 3 }
+type NetworkConfirmation = { contactName: string; verdict: 'positive' | 'neutral' | 'negative'; jobType: string; note?: string; contextTags?: string[]; date: string }
 type WorkHistory = { role: string; employer: string; period: string; description: string; verifiedBy?: 'whatsapp' | 'reference_code' }
 type SkillEndorsement = { skill: string; endorsers: string[]; count: number }
 type Milestone = { label: string; done: boolean; reward: string; weight: number }
@@ -40,6 +41,8 @@ type WorkerProfile = {
   skillEndorsements: SkillEndorsement[]
   milestones: Milestone[]
   confirmations: Confirmation[]
+  networkConfirmations?: NetworkConfirmation[]
+  agency?: string; agencySlug?: string
   behavioural: BehaviouralData
 }
 
@@ -91,10 +94,16 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
       { label: '10+ reviews · 4.5+ avg',  done: false, reward: '"Top Rated" badge + featured listing',   weight: 25 },
       { label: 'Profile shared 3+ times', done: false, reward: '90-day permanent search boost',           weight: 10 },
     ],
+    agency: 'Domus Domestic Services', agencySlug: 'domus-domestic',
     confirmations: [
       { name: 'Chioma A.',    verdict: 'positive', note: 'Cooked for my daughter\'s naming — 120 guests. Organised everything himself. Will use again.', jobType: 'Cooking / Chef', contextTags: ['Family household'], date: '2024-11', trustLevel: 1 },
       { name: 'Tunde B.',     verdict: 'positive', note: 'Our family chef for months. Very clean, always on time, food is excellent.', jobType: 'Cooking / Chef', contextTags: ['Family household', 'High-end project'], date: '2024-09', trustLevel: 2 },
       { name: 'Anonymous',    verdict: 'neutral',  note: 'Food was good but arrived late on day one.', jobType: 'Cooking / Chef', contextTags: [], date: '2024-07', trustLevel: 3 },
+    ],
+    networkConfirmations: [
+      { contactName: 'Chioma', verdict: 'positive', jobType: 'Cooking / Chef', note: 'Cooked for my daughter\'s naming — 120 guests. Organised everything himself.', contextTags: ['Family household'], date: '2024-11' },
+      { contactName: 'Tunde',  verdict: 'positive', jobType: 'Cooking / Chef', note: 'Our family chef for months. Always on time.', contextTags: ['Family household'], date: '2024-09' },
+      { contactName: 'Bisi',   verdict: 'positive', jobType: 'Cooking / Chef', note: 'Hired for my husband\'s 50th. Everyone loved the food.', contextTags: ['High-end project'], date: '2024-06' },
     ],
     behavioural: { responseRate: 92, avgResponseHours: 2, cancellationRate: 3, repeatHireRate: 68, memberSinceYear: 2022, totalJobsCompleted: 87 },
   },
@@ -136,9 +145,13 @@ const MOCK_WORKERS: Record<string, WorkerProfile> = {
       { label: '10+ reviews · 4.5+ avg',  done: false, reward: '"Top Rated" badge + featured listing',  weight: 25 },
       { label: 'Profile shared 3+ times', done: false, reward: '90-day permanent search boost',          weight: 10 },
     ],
+    agency: 'ArtisanPro Lagos', agencySlug: 'artisanpro-lagos',
     confirmations: [
       { name: 'Chioma A.', verdict: 'positive', note: 'Fixed burst pipe at 9pm. Came within the hour. Reasonable charge.', jobType: 'Plumbing', contextTags: ['Emergency callout'], date: '2024-10', trustLevel: 1 },
-      { name: 'James O.',  verdict: 'positive', note: 'Good bathroom installation. Left site clean.', jobType: 'Plumbing', contextTags: ['Budget-conscious'], date: '2024-08', trustLevel: 3 },
+      { name: 'Uche N.',   verdict: 'positive', note: 'Good bathroom installation. Left site clean.', jobType: 'Plumbing', contextTags: ['Budget-conscious'], date: '2024-08', trustLevel: 3 },
+    ],
+    networkConfirmations: [
+      { contactName: 'Chioma', verdict: 'positive', jobType: 'Plumbing', note: 'Fixed burst pipe at 9pm. Came within the hour.', contextTags: ['Emergency callout'], date: '2024-10' },
     ],
     behavioural: { responseRate: 85, avgResponseHours: 4, cancellationRate: 8, repeatHireRate: 55, memberSinceYear: 2023, totalJobsCompleted: 43 },
   },
@@ -243,6 +256,18 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
             </span>
           </div>
 
+          {/* Agency affiliation */}
+          {worker.agency && (
+            <div className="mt-3">
+              <a href={`/agency/${worker.agencySlug}`}
+                className="inline-flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-full px-2.5 py-1 bg-gray-50">
+                <Briefcase size={10} />
+                Works with <span className="font-semibold">{worker.agency}</span>
+                <span className="text-gray-400">· hire direct or via agency →</span>
+              </a>
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-3 gap-0 mt-4 pt-4 border-t border-gray-100 text-center">
             <div>
@@ -299,6 +324,44 @@ export default function WorkerPublicProfile({ params }: { params: { slug: string
           light={light}
           emoji={category?.icon ?? '👷'}
         />
+
+        {/* Your Network — passive referral (TJ Feature 7) */}
+        {worker.networkConfirmations && worker.networkConfirmations.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-2xl p-5 mb-3">
+            <div className="flex items-center gap-2 mb-3">
+              <UserCheck size={14} className="text-green-600" />
+              <h2 className="text-sm font-bold text-green-900">
+                {worker.networkConfirmations.length} of your contacts used {worker.name.split(' ')[0]}
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {worker.networkConfirmations.map((nc, i) => (
+                <div key={i} className="flex items-start gap-3 bg-white rounded-xl p-3">
+                  <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-xs font-black text-white flex-shrink-0">
+                    {nc.contactName[0]}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-gray-900">{nc.contactName}</p>
+                      <span className="text-sm">{nc.verdict === 'positive' ? '👍' : nc.verdict === 'neutral' ? '😐' : '👎'}</span>
+                      <span className="text-xs text-gray-400">{nc.jobType}</span>
+                    </div>
+                    {nc.note && <p className="text-xs text-gray-600 mt-0.5 italic">&ldquo;{nc.note}&rdquo;</p>}
+                    {nc.contextTags && nc.contextTags.length > 0 && (
+                      <div className="flex gap-1 mt-1.5 flex-wrap">
+                        {nc.contextTags.map(t => (
+                          <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{t}</span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-xs text-gray-400 mt-1">{nc.date}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-3">These confirmations are visible to you because these people are in your network.</p>
+          </div>
+        )}
 
         {/* About */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-3">

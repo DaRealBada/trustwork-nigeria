@@ -3,7 +3,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { TrustBadge } from './TrustBadge'
 import { formatRateRange } from '@/lib/utils/formatters'
 import { getCategoryByName } from '@/lib/utils/constants'
-import { MapPin, CheckCircle } from 'lucide-react'
+import { MapPin, CheckCircle, Building2 } from 'lucide-react'
 
 export interface WorkerCardData {
   id: string
@@ -25,6 +25,8 @@ export interface WorkerCardData {
   // What YOU said — shown on level-1 cards
   yourConfirmation?: { verdict: 'positive' | 'neutral' | 'negative'; jobType: string }
   verified?: boolean
+  agency?: string
+  agencySlug?: string
 }
 
 const VERDICT_EMOJI = { positive: '👍', neutral: '😐', negative: '👎' }
@@ -90,18 +92,28 @@ export function WorkerCard({ worker }: { worker: WorkerCardData }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-50">
-          <div className="flex flex-wrap gap-1">
-            {worker.skills.slice(0, 2).map(skill => (
-              <span key={skill} className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={{ backgroundColor: lightColor, color: accentColor }}>
-                {category?.icon} {skill}
-              </span>
-            ))}
+        <div className="mt-3 pt-3 border-t border-gray-50 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-1">
+              {worker.skills.slice(0, 2).map(skill => (
+                <span key={skill} className="text-xs px-2 py-0.5 rounded-full font-medium"
+                  style={{ backgroundColor: lightColor, color: accentColor }}>
+                  {category?.icon} {skill}
+                </span>
+              ))}
+            </div>
+            <span className="text-xs font-semibold flex-shrink-0" style={{ color: accentColor }}>
+              {formatRateRange(worker.rateMin ?? null, worker.rateMax ?? null, worker.rateType)}
+            </span>
           </div>
-          <span className="text-xs font-semibold flex-shrink-0" style={{ color: accentColor }}>
-            {formatRateRange(worker.rateMin ?? null, worker.rateMax ?? null, worker.rateType)}
-          </span>
+          {worker.agency && (
+            <Link href={`/agency/${worker.agencySlug}`} onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+              <Building2 size={10} />
+              <span>{worker.agency}</span>
+              <span className="text-gray-300">· hire direct or via agency</span>
+            </Link>
+          )}
         </div>
       </div>
     </Link>
