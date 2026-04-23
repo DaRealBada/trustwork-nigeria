@@ -285,6 +285,41 @@ const category = getCategoryByName(profile.skills[0]
         </div>
       </div>
 
+      {/* ── Job confirmation request ── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="text-2xl">✅</div>
+          <div className="flex-1">
+            <h2 className="text-sm font-bold text-gray-900">After every job — ask for a confirmation</h2>
+            <p className="text-xs text-gray-500 mt-0.5 mb-3">
+              Send this link to your client when the job is done. Their 👍/😐/👎 goes into your trust network — visible to their contacts when they search for workers like you.
+            </p>
+            <div className="flex gap-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Hi! I just completed a job for you.\n\nCould you take 30 seconds to confirm it on TrustWork? It helps people in your network find workers they can trust.\n\n👉 https://trustwork.ng/confirm/${PROFILE_SLUG}`)}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 py-2.5 px-4 rounded-xl text-white text-xs font-bold"
+                style={{ backgroundColor: '#25D366' }}
+              >
+                <MessageCircle size={13} />
+                Send via WhatsApp
+              </a>
+              <button
+                onClick={async () => {
+                  await navigator.clipboard.writeText(`https://trustwork.ng/confirm/${PROFILE_SLUG}`)
+                  setCopied('link')
+                  setTimeout(() => setCopied(null), 2000)
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                {copied === 'link' ? <CheckCheck size={13} className="text-green-500" /> : <Copy size={13} />}
+                {copied === 'link' ? 'Copied' : 'Copy link'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── About ── */}
       {profile.bio ? (
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4">

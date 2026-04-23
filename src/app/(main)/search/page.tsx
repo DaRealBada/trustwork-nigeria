@@ -3,134 +3,114 @@ import { useState } from 'react'
 import { SearchBar } from '@/components/search/SearchBar'
 import { FilterPanel } from '@/components/search/FilterPanel'
 import { WorkerCard, type WorkerCardData } from '@/components/search/WorkerCard'
+import { Users, UserCheck, Globe } from 'lucide-react'
 
+// Simulated trust graph — in production this comes from the user's contact import
+// Level 1 = your contacts confirmed this worker personally
+// Level 2 = someone your contact knows confirmed them
+// Level 3 = no network connection — public reputation only
 const MOCK_WORKERS: WorkerCardData[] = [
-  // --- In your contacts (trust level 1) ---
   {
-    id: '1',
-    name: 'Emeka Okonkwo',
-    headline: 'Professional Chef | 12 years experience | Lagos',
+    id: '1', name: 'Emeka Okonkwo',
+    headline: 'Professional Chef · Nigerian & Continental · Lagos',
     city: 'Lagos', area: 'Lekki',
-    avgRating: 4.9, reviewCount: 34,
+    recommendRatio: 94, confirmedJobs: 34,
     rateMin: 15000, rateMax: 30000, rateType: 'daily',
-    skills: ['Chef / Cook'],
-    trustLevel: 1,
-    verified: true,
+    skills: ['Chef / Cook'], trustLevel: 1, verified: true,
+    yourConfirmation: { verdict: 'positive', jobType: 'Cooking / Chef' },
   },
   {
-    id: '7',
-    name: 'Seun Fadahunsi',
-    headline: 'Reliable Driver | 7 years | Mainland & Island',
+    id: '7', name: 'Seun Fadahunsi',
+    headline: 'Reliable Driver · Mainland & Island · 7 years',
     city: 'Lagos', area: 'Yaba',
-    avgRating: 4.8, reviewCount: 11,
+    recommendRatio: 91, confirmedJobs: 11,
     rateMin: 40000, rateMax: 60000, rateType: 'monthly',
-    skills: ['Driver'],
-    trustLevel: 1,
-    verified: false,
+    skills: ['Driver'], trustLevel: 1, verified: false,
+    yourConfirmation: { verdict: 'positive', jobType: 'Driving / Logistics' },
   },
-
-  // --- Known by your contacts (trust level 2) ---
   {
-    id: '2',
-    name: 'Bola Adeyemi',
-    headline: 'Experienced Plumber | Lekki & VI',
+    id: '2', name: 'Bola Adeyemi',
+    headline: 'Experienced Plumber · Residential & Commercial · Lagos',
     city: 'Lagos', area: 'Victoria Island',
-    avgRating: 4.7, reviewCount: 21,
+    recommendRatio: 88, confirmedJobs: 21,
     rateMin: 10000, rateMax: 25000, rateType: 'daily',
-    skills: ['Plumber'],
-    trustLevel: 2, trustViaName: 'Chioma',
+    skills: ['Plumber'], trustLevel: 2, trustViaName: 'Chioma',
+    contactConfirmation: { name: 'Chioma', verdict: 'positive', jobType: 'Plumbing', contextTags: ['Emergency callout'] },
   },
   {
-    id: '3',
-    name: 'Funmi Adesanya',
-    headline: 'Personal Driver | Clean record | Available weekends',
+    id: '3', name: 'Funmi Adesanya',
+    headline: 'Personal Driver · Clean record · Available weekends',
     city: 'Lagos', area: 'Ikeja',
-    avgRating: 4.8, reviewCount: 18,
+    recommendRatio: 85, confirmedJobs: 18,
     rateMin: 50000, rateMax: 80000, rateType: 'monthly',
-    skills: ['Driver'],
-    trustLevel: 2, trustViaName: 'Tunde',
+    skills: ['Driver'], trustLevel: 2, trustViaName: 'Tunde',
+    contactConfirmation: { name: 'Tunde', verdict: 'positive', jobType: 'Driving / Logistics', contextTags: ['Family household'] },
   },
   {
-    id: '8',
-    name: 'Adaeze Nwosu',
-    headline: 'Experienced Nanny & Caregiver | 9 years | Lekki',
+    id: '8', name: 'Adaeze Nwosu',
+    headline: 'Experienced Nanny & Caregiver · 9 years · Lekki',
     city: 'Lagos', area: 'Lekki',
-    avgRating: 5.0, reviewCount: 8,
+    recommendRatio: 100, confirmedJobs: 8,
     rateMin: 35000, rateMax: 50000, rateType: 'monthly',
-    skills: ['Nanny / Caregiver'],
-    trustLevel: 2, trustViaName: 'Tunde',
+    skills: ['Nanny / Caregiver'], trustLevel: 2, trustViaName: 'Tunde',
+    contactConfirmation: { name: 'Tunde', verdict: 'positive', jobType: 'Childcare / Nanny', contextTags: ['Family household'] },
   },
   {
-    id: '9',
-    name: 'Yemi Fashola',
-    headline: 'AC & Refrigeration Technician | All brands',
+    id: '9', name: 'Yemi Fashola',
+    headline: 'AC & Refrigeration Technician · All brands',
     city: 'Lagos', area: 'Surulere',
-    avgRating: 4.6, reviewCount: 29,
+    recommendRatio: 83, confirmedJobs: 29,
     rateMin: 5000, rateMax: 15000, rateType: 'daily',
-    skills: ['AC Technician'],
-    trustLevel: 2, trustViaName: 'Chioma',
+    skills: ['AC Technician'], trustLevel: 2, trustViaName: 'Chioma',
+    contactConfirmation: { name: 'Chioma', verdict: 'neutral', jobType: 'Electrical', contextTags: ['Budget-conscious'] },
   },
-
-  // --- General public (trust level 3) ---
   {
-    id: '4',
-    name: 'Chukwudi Eze',
-    headline: 'Certified Electrician | 8 years | All Lagos',
+    id: '4', name: 'Chukwudi Eze',
+    headline: 'Certified Electrician · 8 years · All Lagos',
     city: 'Lagos',
-    avgRating: 4.5, reviewCount: 42,
+    recommendRatio: 79, confirmedJobs: 42,
     rateMin: 8000, rateMax: 20000, rateType: 'daily',
-    skills: ['Electrician'],
-    trustLevel: 3,
+    skills: ['Electrician'], trustLevel: 3,
   },
   {
-    id: '5',
-    name: 'Ngozi Obi',
-    headline: 'Home Cook & Caterer | Nigerian & Continental',
+    id: '5', name: 'Ngozi Obi',
+    headline: 'Home Cook & Caterer · Nigerian & Continental',
     city: 'Lagos', area: 'Gbagada',
-    avgRating: 4.6, reviewCount: 15,
+    recommendRatio: 80, confirmedJobs: 15,
     rateMin: 12000, rateMax: 20000, rateType: 'daily',
-    skills: ['Chef / Cook'],
-    trustLevel: 3,
+    skills: ['Chef / Cook'], trustLevel: 3,
   },
   {
-    id: '6',
-    name: 'Ahmed Musa',
-    headline: 'Carpenter & Furniture Maker | Abuja based',
+    id: '6', name: 'Ahmed Musa',
+    headline: 'Carpenter & Furniture Maker · Abuja',
     city: 'Abuja',
-    avgRating: 4.4, reviewCount: 9,
+    recommendRatio: 72, confirmedJobs: 9,
     rateMin: 7000, rateMax: 15000, rateType: 'daily',
-    skills: ['Carpenter'],
-    trustLevel: 3,
+    skills: ['Carpenter'], trustLevel: 3,
   },
   {
-    id: '10',
-    name: 'Biodun Olatunji',
-    headline: 'Professional Painter | Interior & Exterior | Lagos',
+    id: '10', name: 'Biodun Olatunji',
+    headline: 'Professional Painter · Interior & Exterior · Lagos',
     city: 'Lagos', area: 'Ogba',
-    avgRating: 4.3, reviewCount: 17,
+    recommendRatio: 76, confirmedJobs: 17,
     rateMin: 6000, rateMax: 12000, rateType: 'daily',
-    skills: ['Painter'],
-    trustLevel: 3,
+    skills: ['Painter'], trustLevel: 3,
   },
   {
-    id: '11',
-    name: 'Hauwa Suleiman',
-    headline: 'Expert Tailor & Seamstress | Abuja | All styles',
+    id: '11', name: 'Hauwa Suleiman',
+    headline: 'Expert Tailor & Seamstress · All styles · Abuja',
     city: 'Abuja',
-    avgRating: 4.7, reviewCount: 23,
+    recommendRatio: 87, confirmedJobs: 23,
     rateMin: 5000, rateMax: 20000, rateType: 'project',
-    skills: ['Tailor / Seamstress'],
-    trustLevel: 3,
+    skills: ['Tailor / Seamstress'], trustLevel: 3,
   },
   {
-    id: '12',
-    name: 'Emeka Nwachukwu',
-    headline: 'Security Guard | 5 years | Estates & Events',
+    id: '12', name: 'Emeka Nwachukwu',
+    headline: 'Security Guard · 5 years · Estates & Events',
     city: 'Lagos', area: 'Lekki',
-    avgRating: 4.2, reviewCount: 6,
+    recommendRatio: 67, confirmedJobs: 6,
     rateMin: 30000, rateMax: 45000, rateType: 'monthly',
-    skills: ['Security Guard'],
-    trustLevel: 3,
+    skills: ['Security Guard'], trustLevel: 3,
   },
 ]
 
@@ -143,7 +123,6 @@ export default function SearchPage() {
     if (q && !w.name.toLowerCase().includes(q) && !w.headline.toLowerCase().includes(q) && !w.skills.some(s => s.toLowerCase().includes(q))) return false
     if (filters.city && w.city !== filters.city) return false
     if (filters.area && w.area !== filters.area) return false
-    if (filters.minRating && w.avgRating < parseFloat(filters.minRating)) return false
     if (filters.skill) {
       const catName = filters.skill.replace(/-/g, ' ')
       if (!w.skills.some(s => s.toLowerCase().includes(catName))) return false
@@ -151,15 +130,15 @@ export default function SearchPage() {
     return true
   })
 
-  const contactWorkers = filtered.filter(w => w.trustLevel === 1)
-  const friendWorkers = filtered.filter(w => w.trustLevel === 2)
-  const publicWorkers = filtered.filter(w => w.trustLevel === 3)
+  const yourNetwork = filtered.filter(w => w.trustLevel === 1)
+  const extended    = filtered.filter(w => w.trustLevel === 2)
+  const general     = filtered.filter(w => w.trustLevel === 3)
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
       <div className="mb-4">
         <h1 className="text-xl font-bold text-gray-900">Find Workers</h1>
-        <p className="text-sm text-gray-500">Showing results trusted by people you know</p>
+        <p className="text-sm text-gray-500">Results ordered by how close they are to your network</p>
       </div>
 
       <div className="space-y-3 mb-6">
@@ -174,42 +153,47 @@ export default function SearchPage() {
           <p className="text-sm">Try adjusting your filters</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {contactWorkers.length > 0 && (
+        <div className="space-y-7">
+
+          {yourNetwork.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-500 inline-block" />
-                In your contacts
-              </h2>
+              <div className="flex items-center gap-2 mb-3">
+                <UserCheck size={14} className="text-green-600" />
+                <h2 className="text-xs font-bold text-green-700 uppercase tracking-wide">Your Network</h2>
+                <span className="text-xs text-gray-400 ml-auto">Workers you have personally confirmed</span>
+              </div>
               <div className="space-y-3">
-                {contactWorkers.map(w => <WorkerCard key={w.id} worker={w} />)}
+                {yourNetwork.map(w => <WorkerCard key={w.id} worker={w} />)}
               </div>
             </section>
           )}
 
-          {friendWorkers.length > 0 && (
+          {extended.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-                Known by your contacts
-              </h2>
+              <div className="flex items-center gap-2 mb-3">
+                <Users size={14} className="text-blue-600" />
+                <h2 className="text-xs font-bold text-blue-700 uppercase tracking-wide">Extended Network</h2>
+                <span className="text-xs text-gray-400 ml-auto">Confirmed by people you trust</span>
+              </div>
               <div className="space-y-3">
-                {friendWorkers.map(w => <WorkerCard key={w.id} worker={w} />)}
+                {extended.map(w => <WorkerCard key={w.id} worker={w} />)}
               </div>
             </section>
           )}
 
-          {publicWorkers.length > 0 && (
+          {general.length > 0 && (
             <section>
-              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-gray-400 inline-block" />
-                Other workers
-              </h2>
+              <div className="flex items-center gap-2 mb-3">
+                <Globe size={14} className="text-gray-400" />
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wide">General Reputation</h2>
+                <span className="text-xs text-gray-400 ml-auto">No network connection</span>
+              </div>
               <div className="space-y-3">
-                {publicWorkers.map(w => <WorkerCard key={w.id} worker={w} />)}
+                {general.map(w => <WorkerCard key={w.id} worker={w} />)}
               </div>
             </section>
           )}
+
         </div>
       )}
     </div>
